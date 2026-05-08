@@ -1,206 +1,300 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import {
-  Box, AppBar, Toolbar, Typography, Button, Container,
-  Card, CardContent, CardActionArea, Stack, Chip, Divider, Alert,
+  Box, AppBar, Toolbar, Typography, Button, Container, Divider,
 } from '@mui/material';
 import HubIcon from '@mui/icons-material/Hub';
-import SchoolIcon from '@mui/icons-material/School';
-import ArticleIcon from '@mui/icons-material/Article';
-import BuildIcon from '@mui/icons-material/Build';
 import GitHubIcon from '@mui/icons-material/GitHub';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
-const resources = [
-  {
-    icon: <SchoolIcon sx={{ fontSize: 36, color: '#2E7D32' }} />,
-    title: 'Brief Intro',
-    desc: 'A brief introduction to Graphical Models and Bayesian Networks by Kevin Murphy (University of British Columbia).',
-    href: 'https://www.cs.ubc.ca/~murphyk/Bayes/bnintro.html',
-  },
-  {
-    icon: <ArticleIcon sx={{ fontSize: 36, color: '#2E7D32' }} />,
-    title: 'Bayesian Nets Tutorial',
-    desc: 'Constructing Bayesian networks from prior knowledge — Bayesian statistical methods for using data to improve models.',
-    href: 'https://en.wikipedia.org/wiki/Bayesian_network',
-  },
-  {
-    icon: <HubIcon sx={{ fontSize: 36, color: '#2E7D32' }} />,
-    title: 'Wikipedia Reference',
-    desc: 'Comprehensive reference on Bayesian networks — structure, inference algorithms, applications, and history.',
-    href: 'https://en.wikipedia.org/wiki/Bayesian_network',
-  },
+const PURPLE       = '#563d7c';
+const PURPLE_LIGHT = '#6f5499';
+const PURPLE_TEXT  = '#cdbfe3';
+const LINK_COLOR   = '#428bca';
+const WARN_BORDER  = '#f0ad4e';
+
+const NAV_ITEMS = [
+  { id: 'overview',  label: 'Overview' },
+  { id: 'software',  label: 'Software Implementations' },
+  { id: 'about',     label: 'About' },
+  { id: 'contact',   label: 'Contact' },
 ];
 
-const software = [
-  {
-    title: 'Weka',
-    desc: 'The Weka machine learning package from Waikato University. Includes Bayesian network classifiers alongside classification, regression, clustering, and visualization tools.',
-    href: 'https://www.cs.waikato.ac.nz/ml/weka/',
-    note: 'Requires Java',
-  },
-  {
-    title: 'Tetrad Project',
-    desc: 'Creates, simulates, estimates, tests, and searches for causal and statistical models. Sophisticated methods in a friendly interface — no programming knowledge required.',
-    href: 'https://www.cmu.edu/dietrich/philosophy/tetrad/',
-    note: null,
-  },
-];
+function useActiveSection() {
+  const [active, setActive] = useState('overview');
+  useEffect(() => {
+    const observers = NAV_ITEMS.map(({ id }) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const observer = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) setActive(id); },
+        { rootMargin: '-20% 0px -70% 0px' }
+      );
+      observer.observe(el);
+      return observer;
+    });
+    return () => observers.forEach(o => o?.disconnect());
+  }, []);
+  return active;
+}
+
+function Section({ id, title, children }) {
+  return (
+    <Box id={id} component="section" sx={{ mb: 5 }}>
+      <Typography variant="h4" fontWeight={700} sx={{ borderBottom: '1px solid #e5e5e5', pb: 1, mb: 2 }}>
+        {title}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function A({ href, children }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" style={{ color: LINK_COLOR }}>
+      {children}
+    </a>
+  );
+}
 
 export default function Home() {
+  const active = useActiveSection();
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
 
-      {/* Hero */}
-      <Box sx={{
-        background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)',
-        color: '#fff',
-        minHeight: 480,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
+      {/* Navbar — white, purple brand text */}
+      <AppBar position="sticky" elevation={0} sx={{
+        bgcolor: '#fff',
+        borderBottom: '1px solid #e7e7e7',
+        color: PURPLE,
       }}>
-        <AppBar position="fixed" elevation={0} sx={{
-          bgcolor: 'rgba(27, 94, 32, 0.85)',
-          backgroundImage: 'none',
-          boxShadow: 'none',
-          backdropFilter: 'saturate(180%) blur(14px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(14px)',
-          borderBottom: '1px solid rgba(255,255,255,0.12)',
-        }}>
-          <Toolbar variant="dense" sx={{ minHeight: '44px !important' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: '-0.5px' }}>
-              Probabilistic.net
-            </Typography>
-            <Button color="inherit" href="#overview">Overview</Button>
-            <Button color="inherit" href="#software">Software</Button>
-            <Button color="inherit" href="#about">About</Button>
-            <Button
-              color="inherit"
-              href="https://github.com/marink/probabilistic.net"
-              target="_blank"
-              startIcon={<GitHubIcon />}
-            >
-              GitHub
-            </Button>
-          </Toolbar>
-        </AppBar>
+        <Toolbar variant="dense" sx={{ minHeight: '50px !important' }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, flexGrow: 1, color: PURPLE }}>
+            Bayesian Networks
+          </Typography>
+          <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#top">Home</Button>
+          <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#about">About</Button>
+          <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#contact">Contact</Button>
+        </Toolbar>
+      </AppBar>
 
-        <Box sx={{ position: 'relative', zIndex: 1, mt: 'calc(10vh + 30px)', pb: 6, px: 2, textAlign: 'center' }}>
-          <Typography variant="h3" fontWeight={800} gutterBottom sx={{ mt: '30px' }}>
-            Bayesian Network
-          </Typography>
-          <Typography variant="subtitle1" sx={{ opacity: 0.7, fontStyle: 'italic', mb: 2 }}>
-            /ˈbeɪzɪən ˈnɛtˌwɜːk/
-          </Typography>
-          <Typography variant="h6" sx={{ opacity: 0.85, maxWidth: 640, mx: 'auto', mb: 5 }}>
-            A probabilistic graphical model — a <strong>D</strong>irected <strong>A</strong>cyclic <strong>G</strong>raph
-            of nodes representing random variables, with edges encoding conditional probability relationships.
-          </Typography>
-          <Typography variant="body1" sx={{ opacity: 0.75, maxWidth: 600, mx: 'auto', mb: 4 }}>
-            The web reference with information and tutorials for learning about Bayesian Networks.
-          </Typography>
-          <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
-            {['Bayesian Networks', 'Probabilistic Graphical Models', 'DAG', 'Conditional Probability', 'Inference'].map(t => (
-              <Chip key={t} label={t} size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }} />
-            ))}
-          </Stack>
+      {/* Hero — purple gradient, left-aligned, definition box right */}
+      <Box id="top" sx={{
+        background: `linear-gradient(to bottom, ${PURPLE} 0%, ${PURPLE_LIGHT} 100%)`,
+        color: '#fff',
+        py: 3.75,
+        px: { xs: 3, md: 8 },
+      }}>
+        <Box sx={{ maxWidth: 960, mx: 'auto', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+          {/* Left: title + subtitle */}
+          <Box sx={{ flex: '1 1 auto' }}>
+            <Typography variant="h3" fontWeight={700} gutterBottom>
+              Bayesian Network
+            </Typography>
+            <Typography variant="body1" sx={{ color: PURPLE_TEXT, maxWidth: 480 }}>
+              The web reference with information and tutorials for learning about Bayesian Networks.
+            </Typography>
+          </Box>
+
+          {/* Right: definition box */}
+          <Box sx={{
+            flex: '0 0 340px',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: 1,
+            p: 2,
+            display: { xs: 'none', md: 'block' },
+          }}>
+            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mb: 1 }}>
+              bayesian network: /ˈbeɪzɪən ˈnɛtˌwɜːk/
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+              <Box sx={{ opacity: 0.7, flexShrink: 0 }}>
+                <HubIcon sx={{ fontSize: 48, color: PURPLE_TEXT }} />
+              </Box>
+              <Typography variant="body2" sx={{ color: PURPLE_TEXT, fontSize: 13 }}>
+                A probabilistic graphical model, which is a <strong>D</strong>irected <strong>A</strong>cyclic{' '}
+                <strong>G</strong>raph of nodes that represent random variables, and directed edges that
+                represent conditional probability relationship between these variables.
+              </Typography>
+            </Box>
+          </Box>
         </Box>
       </Box>
 
-      <Container maxWidth="md" sx={{ py: 8, px: { xs: 3, sm: 5, md: 6 }, flexGrow: 1 }}>
+      {/* Body — main content + sticky sidebar */}
+      <Container maxWidth="lg" sx={{ py: 5, flexGrow: 1 }}>
+        <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
 
-        {/* Overview */}
-        <Box id="overview" sx={{ mb: 8 }}>
-          <Typography variant="h4" fontWeight={700} gutterBottom>Overview</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            Follow the links below to access resources with abundant information on Bayesian Networks.
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 3 }}>
-            {resources.map(r => (
-              <Card key={r.title} sx={{ '&:hover': { boxShadow: 4 }, transition: 'box-shadow 0.2s' }}>
-                <CardActionArea href={r.href} target="_blank" rel="noreferrer" sx={{ height: '100%', p: 1 }}>
-                  <CardContent>
-                    <Box mb={1}>{r.icon}</Box>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>{r.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">{r.desc}</Typography>
-                  </CardContent>
-                </CardActionArea>
-              </Card>
-            ))}
-          </Box>
-        </Box>
+          {/* Main content */}
+          <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
 
-        <Divider sx={{ mb: 8 }} />
+            <Section id="overview" title="Overview">
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                Follow the links below to access resources with abundant information Bayesian Networks.
+              </Typography>
 
-        {/* Software */}
-        <Box id="software" sx={{ mb: 8 }}>
-          <Typography variant="h4" fontWeight={700} gutterBottom>Software Implementations</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            There are numerous software implementations for Bayesian networks. The most popular are listed below.
-          </Typography>
-          <Alert severity="info" sx={{ mb: 4 }}>
-            <strong>Java SDK Required</strong> — Some packages require Java. Download the bundled version if you don't have Java installed.
-          </Alert>
-          <Stack spacing={3}>
-            {software.map(s => (
-              <Card key={s.title} sx={{ '&:hover': { boxShadow: 2 }, transition: 'box-shadow 0.2s' }}>
-                <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                  <BuildIcon sx={{ color: '#2E7D32', mt: 0.5, flexShrink: 0 }} />
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
-                      <Typography variant="h6" fontWeight={700}>{s.title}</Typography>
-                      {s.note && <Chip label={s.note} size="small" color="warning" variant="outlined" />}
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{s.desc}</Typography>
-                    <Button
-                      size="small"
-                      href={s.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      endIcon={<OpenInNewIcon />}
-                      sx={{ color: '#2E7D32' }}
-                    >
-                      More Info
-                    </Button>
+              {/* 3-column resource cards */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 3, mb: 4 }}>
+                {[
+                  {
+                    title: 'Brief Intro',
+                    body: <>A brief introduction to <strong>Graphical Models</strong> and Bayesian Networks by Kevin Murphy (<em>since 1998</em>).</>,
+                    href: 'https://www.cs.ubc.ca/~murphyk/Bayes/bnintro.html',
+                  },
+                  {
+                    title: 'Bayesian Nets Tutorial',
+                    body: <>A paper that discusses methods for <em>constructing Bayesian networks from prior knowledge</em> and summarize <strong>Bayesian statistical methods</strong> for using data to improve these models.</>,
+                    href: 'https://en.wikipedia.org/wiki/Bayesian_network',
+                  },
+                  {
+                    title: 'Microsoft BN Editor',
+                    body: <><strong>Microsoft Bayesian Network Editor</strong> — a component-based Windows application for creating, assessing, and evaluating Bayesian Networks, created at <A href="http://research.microsoft.com/en-us/about/default.aspx">Microsoft Research</A>.</>,
+                    href: 'http://research.microsoft.com/en-us/um/redmond/groups/adapt/msbnx/',
+                  },
+                ].map(r => (
+                  <Box key={r.title}>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>{r.title}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{r.body}</Typography>
+                    <a href={r.href} target="_blank" rel="noreferrer" style={{
+                      display: 'inline-block',
+                      padding: '4px 10px',
+                      border: '1px solid #ccc',
+                      borderRadius: 4,
+                      fontSize: 13,
+                      color: '#333',
+                      textDecoration: 'none',
+                      background: '#fff',
+                    }}>
+                      More Info »
+                    </a>
                   </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
+                ))}
+              </Box>
+
+              <Typography variant="h6" fontWeight={600} gutterBottom>More Info on the Web</Typography>
+              <Typography variant="body2" color="text.secondary">
+                A great resource of information is the Wikipedia{' '}
+                <A href="https://en.wikipedia.org/wiki/Bayesian_network">Bayesian network page</A>.
+              </Typography>
+            </Section>
+
+            <Section id="software" title="Software Implementations">
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                There are numerous software implementations for the Bayesian networks. The most popular implementations are listed below.
+              </Typography>
+
+              {/* Java SDK callout */}
+              <Box sx={{
+                borderLeft: `4px solid ${WARN_BORDER}`,
+                bgcolor: '#fcf8e3',
+                px: 2.5,
+                py: 2,
+                mb: 4,
+                borderRadius: '0 4px 4px 0',
+              }}>
+                <Typography variant="body2" sx={{ color: '#8a6d3b', fontWeight: 700, mb: 0.5 }}>
+                  Java SDK Required
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#8a6d3b' }}>
+                  There are two types of downloads for the Weka Machine learning package: one that includes the JVM,
+                  and the other that assumes you have it already installed. If you don't have Java on your machine
+                  download the bigger package.
+                </Typography>
+              </Box>
+
+              <Typography variant="h5" fontWeight={700} gutterBottom>The Weka Data Mining Software</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                This package makes available most Machine Learning algorithms as tools for data pre-processing,
+                classification, regression, clustering, association rules, and visualization, wich can be applied
+                to practical problems.
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                The Weka machine learning package can be downloaded from the Waikato University{' '}
+                <A href="https://www.cs.waikato.ac.nz/ml/weka/">machine learning</A> site.
+              </Typography>
+
+              <Typography variant="h5" fontWeight={700} gutterBottom>The Tetrad Project</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Tetrad is a program which creates, simulates data from, estimates, tests, predicts with, and searches
+                for causal and statistical models. The aim of the program is to provide sophisticated methods in a
+                friendly interface requiring very little statistical sophistication of the user and no programming knowledge.
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                The Tetrad packages can be downloaded from the{' '}
+                <A href="https://www.cmu.edu/dietrich/philosophy/tetrad/">Tetrad</A> page.
+              </Typography>
+            </Section>
+
+            <Section id="about" title="About">
+              <Typography variant="body1">
+                This web site was built to help all those who want to learn and get a deep understanding about Bayesian Networks.
+              </Typography>
+            </Section>
+
+            <Section id="contact" title="Contact">
+              <Typography variant="body1">
+                For questions or suggestions on how to improve this site please email Marin Kokona with user
+                name <code style={{ background: '#f5f5f5', padding: '2px 5px', borderRadius: 3, color: PURPLE }}>mar1n</code> at Yahoo! email.
+              </Typography>
+            </Section>
+
+          </Box>
+
+          {/* Sticky sidebar TOC with scrollspy */}
+          <Box sx={{
+            flex: '0 0 180px',
+            display: { xs: 'none', lg: 'block' },
+            position: 'sticky',
+            top: 70,
+            alignSelf: 'flex-start',
+          }}>
+            <Box component="nav">
+              {NAV_ITEMS.map(({ id, label }) => (
+                <Box key={id} sx={{ mb: 0.5 }}>
+                  <a href={`#${id}`} style={{
+                    color: active === id ? PURPLE : '#999',
+                    fontWeight: active === id ? 700 : 400,
+                    fontSize: 13,
+                    textDecoration: 'none',
+                    transition: 'color 0.15s',
+                  }}>
+                    {label}
+                  </a>
+                </Box>
+              ))}
+              <Divider sx={{ my: 1.5 }} />
+              <a href="#top" style={{ color: '#999', fontSize: 13, textDecoration: 'none' }}>
+                Back to top
+              </a>
+            </Box>
+          </Box>
+
         </Box>
-
-        <Divider sx={{ mb: 8 }} />
-
-        {/* About */}
-        <Box id="about" sx={{ mb: 8 }}>
-          <Typography variant="h4" fontWeight={700} gutterBottom>About</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-            This site was built to help those who want to learn and develop a deep understanding of Bayesian Networks.
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Companion to{' '}
-            <a href="https://machinelearning.js.org" target="_blank" rel="noreferrer" style={{ color: '#2E7D32' }}>
-              MachineLearning.js
-            </a>
-            {' '}— interactive machine learning tools running entirely in your browser.
-          </Typography>
-        </Box>
-
       </Container>
 
-      <Box sx={{
+      {/* Footer */}
+      <Box component="footer" sx={{
+        borderTop: '1px solid #e5e5e5',
+        bgcolor: '#f5f5f5',
         py: 4,
-        textAlign: 'center',
-        bgcolor: '#F5F5F7',
-        borderTop: '1px solid #D2D2D7',
+        px: { xs: 3, md: 8 },
       }}>
-        <Typography sx={{ fontSize: 12, color: '#6E6E73' }}>
-          © 2019–2026 Marin Kokona · Probabilistic.net · Open source · MIT License
-        </Typography>
+        <Box sx={{ maxWidth: 960, mx: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            © 2009–2026 Marin Kokona · probabilistic.net / bayesian.network
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <a href="https://machinelearning.js.org" target="_blank" rel="noreferrer"
+              style={{ color: PURPLE, fontSize: 13, textDecoration: 'none' }}>
+              MachineLearning.js
+            </a>
+            <a href="https://github.com/marink/probabilistic.net" target="_blank" rel="noreferrer"
+              style={{ color: '#999', fontSize: 13, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <GitHubIcon sx={{ fontSize: 16 }} /> GitHub
+            </a>
+          </Box>
+        </Box>
       </Box>
 
     </Box>
