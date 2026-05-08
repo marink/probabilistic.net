@@ -1,13 +1,5 @@
 node_modules/
-.next/
 out/
 *.log
 .DS_Store
 .env*.local
-
-# Next.js static export output — belongs on gh-pages branch only
-_next/
-static/
-.nojekyll
-404.html
-index.html
