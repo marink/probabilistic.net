@@ -411,6 +411,11 @@ export default function Home() {
             </a>
           </Box>
         </Box>
+        <Typography variant="caption" sx={{ display: 'block', maxWidth: 960, mx: 'auto', mt: 2, color: '#aaa' }}>
+          For educational and research use only. Results are provided &ldquo;as is&rdquo; without
+          warranty of any kind and should not be relied upon for clinical, financial, safety-critical,
+          or other consequential decisions.
+        </Typography>
       </Box>
 
     </Box>
