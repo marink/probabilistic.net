@@ -454,7 +454,9 @@ export default function Builder() {
     if (mode !== 'select') return;
     dragRef.current = { id: nodeId };
     didDragRef.current = false;
-    try { svgRef.current.setPointerCapture(e.pointerId); } catch {}
+    // Note: do NOT call setPointerCapture here — it re-routes the synthetic click
+    // event to the SVG element, bypassing handleNodeClick and breaking CPT panel.
+    // onPointerMove/Up on the SVG parent already handle drag correctly.
     const n = simNodesRef.current.find(n => n.id === nodeId);
     if (n) { n.fx = n.x; n.fy = n.y; }
     simRef.current?.alphaTarget(0.3).restart();
