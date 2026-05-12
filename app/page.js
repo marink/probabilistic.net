@@ -4,17 +4,20 @@ import { useState, useEffect } from 'react';
 import {
   Box, AppBar, Toolbar, Typography, Button, Container, Divider,
 } from '@mui/material';
-import HubIcon from '@mui/icons-material/Hub';
+import HubIcon   from '@mui/icons-material/Hub';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import Link      from 'next/link';
 
 const PURPLE       = '#563d7c';
 const PURPLE_LIGHT = '#6f5499';
 const PURPLE_TEXT  = '#cdbfe3';
+const PP           = '#f0ebf8';
 const LINK_COLOR   = '#428bca';
 const WARN_BORDER  = '#f0ad4e';
 
 const NAV_ITEMS = [
   { id: 'overview',  label: 'Overview' },
+  { id: 'concepts',  label: 'Key Concepts' },
   { id: 'software',  label: 'Software Implementations' },
   { id: 'about',     label: 'About' },
   { id: 'contact',   label: 'Contact' },
@@ -73,6 +76,7 @@ export default function Home() {
             Bayesian Networks
           </Typography>
           <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#top">Home</Button>
+          <Button component={Link} href="/builder/" sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }}>Builder</Button>
           <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#about">About</Button>
           <Button sx={{ color: '#777', fontWeight: 400, textTransform: 'none' }} href="#contact">Contact</Button>
         </Toolbar>
@@ -177,6 +181,118 @@ export default function Home() {
                 A great resource of information is the Wikipedia{' '}
                 <A href="https://en.wikipedia.org/wiki/Bayesian_network">Bayesian network page</A>.
               </Typography>
+            </Section>
+
+            {/* ── Key Concepts ── */}
+            <Section id="concepts" title="Key Concepts">
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                A Bayesian Network is defined by two components: a <strong>directed acyclic graph (DAG)</strong> whose
+                nodes represent random variables, and a set of <strong>conditional probability distributions</strong>
+                — one per node — that together specify the full joint distribution over all variables.
+              </Typography>
+
+              {/* 2×2 concept grid */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mb: 4 }}>
+                {[
+                  {
+                    title: 'Nodes',
+                    body: 'Each node represents a random variable. It can be binary (True/False), discrete (low/med/high), or continuous — whatever domain the variable inhabits.',
+                  },
+                  {
+                    title: 'Directed Edges',
+                    body: 'An arrow A → B means A is a direct parent of B. B\'s probability distribution depends on the value of A. The graph must remain acyclic — no variable can be its own ancestor.',
+                  },
+                  {
+                    title: 'Conditional Probability Tables',
+                    body: 'Each node stores P(node | parents). Root nodes (no parents) store a prior P(node). Together these tables encode the full joint distribution compactly.',
+                  },
+                  {
+                    title: 'D-separation',
+                    body: 'A graphical criterion for reading off conditional independencies directly from the graph structure — without computing any probabilities. It is the key to efficient inference.',
+                  },
+                ].map(c => (
+                  <Box key={c.title} sx={{
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 1,
+                    p: 2,
+                    bgcolor: '#fff',
+                  }}>
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: PURPLE, mb: 0.5 }}>
+                      {c.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {c.body}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+
+              {/* Static Sprinkler network SVG */}
+              <Box sx={{ mb: 1.5 }}>
+                <svg
+                  viewBox="0 0 400 280"
+                  width="400"
+                  height="280"
+                  style={{ display: 'block', overflow: 'visible' }}
+                  aria-label="The Sprinkler Network diagram"
+                >
+                  <defs>
+                    <marker id="arr-static" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L0,6 L8,3 z" fill={PURPLE} />
+                    </marker>
+                  </defs>
+
+                  {/* Edges: Cloudy→Sprinkler, Cloudy→Rain, Sprinkler→WetGrass, Rain→WetGrass */}
+                  {/* Cloudy(200,50) → Sprinkler(80,160) */}
+                  <line x1={187} y1={78} x2={97} y2={133} stroke={PURPLE} strokeWidth={1.8} markerEnd="url(#arr-static)" />
+                  {/* Cloudy(200,50) → Rain(320,160) */}
+                  <line x1={213} y1={78} x2={303} y2={133} stroke={PURPLE} strokeWidth={1.8} markerEnd="url(#arr-static)" />
+                  {/* Sprinkler(80,160) → WetGrass(200,260) */}
+                  <line x1={103} y1={188} x2={183} y2={233} stroke={PURPLE} strokeWidth={1.8} markerEnd="url(#arr-static)" />
+                  {/* Rain(320,160) → WetGrass(200,260) */}
+                  <line x1={297} y1={188} x2={217} y2={233} stroke={PURPLE} strokeWidth={1.8} markerEnd="url(#arr-static)" />
+
+                  {/* Nodes */}
+                  {[
+                    { label: 'Cloudy',     x: 200, y:  50 },
+                    { label: 'Sprinkler',  x:  80, y: 160 },
+                    { label: 'Rain',       x: 320, y: 160 },
+                    { label: 'Wet Grass',  x: 200, y: 260 },
+                  ].map(n => (
+                    <g key={n.label} transform={`translate(${n.x},${n.y})`}>
+                      <circle r={38} fill="#fff" stroke={PURPLE} strokeWidth={1.8} />
+                      <text
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize={n.label.length > 9 ? 9 : 11}
+                        fontFamily="Helvetica Neue, Arial, sans-serif"
+                        fill={PURPLE}
+                        fontWeight={600}
+                      >
+                        {n.label}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
+                The Sprinkler Network — a classic teaching example.
+              </Typography>
+
+              <Button
+                component={Link}
+                href="/builder/"
+                variant="outlined"
+                sx={{
+                  borderColor: PURPLE,
+                  color: PURPLE,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  '&:hover': { bgcolor: PP, borderColor: PURPLE },
+                }}
+              >
+                → Try the Interactive Builder
+              </Button>
             </Section>
 
             <Section id="software" title="Software Implementations">
