@@ -1,32 +1,33 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useReducer } from 'react';
+import {
+  forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide,
+} from 'd3-force';
 import {
   Box, Typography, Button, ButtonGroup, Tooltip, Chip,
   AppBar, Toolbar, Paper,
 } from '@mui/material';
-import NearMeIcon           from '@mui/icons-material/NearMe';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircle';
-import ArrowForwardIcon     from '@mui/icons-material/ArrowForward';
-import DeleteOutlineIcon    from '@mui/icons-material/Delete';
-import HubIcon              from '@mui/icons-material/Hub';
-import GitHubIcon           from '@mui/icons-material/GitHub';
-import Link                 from 'next/link';
+import NearMeIcon       from '@mui/icons-material/NearMe';
+import AddCircleIcon    from '@mui/icons-material/AddCircle';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import DeleteIcon       from '@mui/icons-material/Delete';
+import HubIcon          from '@mui/icons-material/Hub';
+import GitHubIcon       from '@mui/icons-material/GitHub';
+import Link             from 'next/link';
 
 const PURPLE       = '#563d7c';
 const PURPLE_LIGHT = '#6f5499';
-const PURPLE_TEXT  = '#cdbfe3';
 const PP           = '#f0ebf8';
-
-const R = 32;
+const R            = 30;
 
 const EXAMPLES = {
   Sprinkler: {
     nodes: [
-      { id: 'C', label: 'Cloudy',    x: 400, y:  90 },
-      { id: 'S', label: 'Sprinkler', x: 240, y: 230 },
-      { id: 'R', label: 'Rain',      x: 560, y: 230 },
-      { id: 'W', label: 'Wet Grass', x: 400, y: 370 },
+      { id: 'C', label: 'Cloudy' },
+      { id: 'S', label: 'Sprinkler' },
+      { id: 'R', label: 'Rain' },
+      { id: 'W', label: 'Wet Grass' },
     ],
     edges: [
       { id: 'CS', from: 'C', to: 'S' }, { id: 'CR', from: 'C', to: 'R' },
@@ -35,11 +36,11 @@ const EXAMPLES = {
   },
   'Burglary / Alarm': {
     nodes: [
-      { id: 'B', label: 'Burglary',   x: 220, y:  90 },
-      { id: 'E', label: 'Earthquake', x: 580, y:  90 },
-      { id: 'A', label: 'Alarm',      x: 400, y: 230 },
-      { id: 'J', label: 'John Calls', x: 240, y: 370 },
-      { id: 'M', label: 'Mary Calls', x: 560, y: 370 },
+      { id: 'B', label: 'Burglary' },
+      { id: 'E', label: 'Earthquake' },
+      { id: 'A', label: 'Alarm' },
+      { id: 'J', label: 'John Calls' },
+      { id: 'M', label: 'Mary Calls' },
     ],
     edges: [
       { id: 'BA', from: 'B', to: 'A' }, { id: 'EA', from: 'E', to: 'A' },
@@ -48,11 +49,11 @@ const EXAMPLES = {
   },
   Student: {
     nodes: [
-      { id: 'D', label: 'Difficulty',   x: 200, y:  90 },
-      { id: 'I', label: 'Intelligence', x: 560, y:  90 },
-      { id: 'G', label: 'Grade',        x: 350, y: 230 },
-      { id: 'S', label: 'SAT',          x: 570, y: 250 },
-      { id: 'L', label: 'Letter',       x: 280, y: 370 },
+      { id: 'D', label: 'Difficulty' },
+      { id: 'I', label: 'Intelligence' },
+      { id: 'G', label: 'Grade' },
+      { id: 'S', label: 'SAT' },
+      { id: 'L', label: 'Letter' },
     ],
     edges: [
       { id: 'DG', from: 'D', to: 'G' }, { id: 'IG', from: 'I', to: 'G' },
@@ -73,307 +74,308 @@ function wouldCycle(edges, fromId, toId) {
   return false;
 }
 
-function linePts(a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const d = Math.hypot(dx, dy) || 1;
+function linePts(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const d  = Math.hypot(dx, dy) || 1;
   const ux = dx / d, uy = dy / d;
   return {
-    x1: a.x + ux * R,
-    y1: a.y + uy * R,
-    x2: b.x - ux * (R + 9),
-    y2: b.y - uy * (R + 9),
+    x1: from.x + ux * R,
+    y1: from.y + uy * R,
+    x2: to.x   - ux * (R + 9),
+    y2: to.y   - uy * (R + 9),
   };
 }
 
 let _seq = 1;
 
 export default function Builder() {
-  const [nodes, setNodes]   = useState(() => EXAMPLES.Sprinkler.nodes.map(n => ({ ...n })));
-  const [edges, setEdges]   = useState(() => EXAMPLES.Sprinkler.edges.map(e => ({ ...e })));
-  const [mode, setMode]     = useState('select');
-  const [selected, setSelected] = useState(null); // { type: 'node'|'edge', id }
-  const [edgeFrom, setEdgeFrom] = useState(null);
-  const [drag, setDrag]     = useState(null);  // { id, ox, oy }
-  const [mouse, setMouse]   = useState(null);  // for ghost edge { x, y }
-  const [newNode, setNewNode]   = useState(null); // { x, y }
-  const [newLabel, setNewLabel] = useState('');
-  const svgRef = useRef();
+  // ── Logical graph state ──────────────────────────────────────────────────
+  const [nodes, setNodes] = useState(() =>
+    EXAMPLES.Sprinkler.nodes.map(({ id, label }) => ({ id, label }))
+  );
+  const [edges, setEdges] = useState(() =>
+    EXAMPLES.Sprinkler.edges.map(e => ({ ...e }))
+  );
 
+  // ── UI mode ──────────────────────────────────────────────────────────────
+  const [mode,     setMode]     = useState('select');
+  const [selected, setSelected] = useState(null);
+  const [edgeFrom, setEdgeFrom] = useState(null);
+  const [mouse,    setMouse]    = useState(null);
+  const [newNode,  setNewNode]  = useState(null);
+  const [newLabel, setNewLabel] = useState('');
+
+  // ── Force simulation ─────────────────────────────────────────────────────
+  const svgRef      = useRef(null);
+  const simRef      = useRef(null);
+  // Mutable d3 node objects — positions updated in-place by simulation
+  const simNodesRef = useRef(
+    EXAMPLES.Sprinkler.nodes.map((n, i) => ({
+      id: n.id, label: n.label,
+      // small ring spread so nodes don't all start exactly at the same point
+      x: 400 + Math.cos((i / EXAMPLES.Sprinkler.nodes.length) * 2 * Math.PI) * 40,
+      y: 300 + Math.sin((i / EXAMPLES.Sprinkler.nodes.length) * 2 * Math.PI) * 40,
+    }))
+  );
+  const dragRef     = useRef(null); // { id } while pointer is held down
+  const didDragRef  = useRef(false);
+  const [, rerender] = useReducer(x => x + 1, 0);
+
+  // Restart simulation whenever the logical graph changes
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    const W = svgEl ? svgEl.clientWidth  : 800;
+    const H = svgEl ? svgEl.clientHeight : 500;
+
+    // Preserve existing positions; seed new nodes near center
+    const byId = Object.fromEntries(simNodesRef.current.map(n => [n.id, n]));
+    simNodesRef.current = nodes.map(n =>
+      byId[n.id]
+        ? { ...byId[n.id], label: n.label }
+        : {
+            id: n.id, label: n.label,
+            x: W / 2 + (Math.random() - 0.5) * 80,
+            y: H / 2 + (Math.random() - 0.5) * 80,
+          }
+    );
+
+    const simEdges = edges.map(e => ({ source: e.from, target: e.to, _id: e.id }));
+
+    if (simRef.current) simRef.current.stop();
+
+    const sim = forceSimulation(simNodesRef.current)
+      .force('charge',  forceManyBody().strength(-380))
+      .force('link',    forceLink(simEdges).id(d => d.id).distance(130).strength(0.5))
+      .force('center',  forceCenter(W / 2, H / 2).strength(0.04))
+      .force('collide', forceCollide(R + 14))
+      .alphaDecay(0.025)
+      .on('tick', () => rerender());
+
+    simRef.current = sim;
+    return () => sim.stop();
+  }, [nodes, edges]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
   function pt(e) {
-    const { left, top } = svgRef.current.getBoundingClientRect();
-    return { x: e.clientX - left, y: e.clientY - top };
+    const rect = svgRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
   function changeMode(m) {
-    setMode(m);
-    setSelected(null);
-    setEdgeFrom(null);
-    setNewNode(null);
-    setNewLabel('');
-    setDrag(null);
-    setMouse(null);
+    setMode(m); setSelected(null); setEdgeFrom(null);
+    setNewNode(null); setNewLabel(''); setMouse(null);
+    dragRef.current = null; didDragRef.current = false;
   }
 
   function loadExample(name) {
     if (!name) return;
     const ex = EXAMPLES[name];
-    setNodes(ex.nodes.map(n => ({ ...n })));
+    // Seed on a small ring so they burst outward organically
+    simNodesRef.current = ex.nodes.map((n, i) => ({
+      id: n.id, label: n.label,
+      x: 400 + Math.cos((i / ex.nodes.length) * 2 * Math.PI) * 30,
+      y: 300 + Math.sin((i / ex.nodes.length) * 2 * Math.PI) * 30,
+    }));
+    setNodes(ex.nodes.map(({ id, label }) => ({ id, label })));
     setEdges(ex.edges.map(e => ({ ...e })));
-    setSelected(null);
-    setEdgeFrom(null);
-    setNewNode(null);
-    setNewLabel('');
+    setSelected(null); setEdgeFrom(null); setNewNode(null); setNewLabel('');
     setMode('select');
   }
 
-  /* ── SVG pointer handlers ── */
-
-  function handleSvgMouseMove(e) {
+  // ── Pointer events (SVG level) ──────────────────────────────────────────
+  function handleSvgPointerMove(e) {
     const p = pt(e);
     setMouse(p);
-    if (drag) {
-      setNodes(prev => prev.map(n =>
-        n.id === drag.id ? { ...n, x: p.x + drag.ox, y: p.y + drag.oy } : n
-      ));
+    if (dragRef.current) {
+      const n = simNodesRef.current.find(n => n.id === dragRef.current.id);
+      if (n) {
+        const moved = Math.hypot(p.x - (n.fx ?? n.x), p.y - (n.fy ?? n.y));
+        if (moved > 3) didDragRef.current = true;
+        n.fx = p.x;
+        n.fy = p.y;
+      }
+      simRef.current?.alpha(0.3).restart();
     }
   }
 
-  function handleSvgMouseUp() {
-    setDrag(null);
+  function handleSvgPointerUp() {
+    if (dragRef.current) {
+      const n = simNodesRef.current.find(n => n.id === dragRef.current.id);
+      if (n) { n.fx = null; n.fy = null; }
+      simRef.current?.alphaTarget(0).restart();
+      dragRef.current = null;
+    }
   }
 
   function handleSvgClick(e) {
-    if (drag) return;
+    const tag = e.target.tagName.toLowerCase();
+    const onCanvas = tag === 'svg' || tag === 'rect' || tag === 'line';
 
-    if (mode === 'addNode') {
-      const p = pt(e);
-      // Only open input if click was on SVG canvas (not a node)
-      const tag = e.target.tagName.toLowerCase();
-      if (tag === 'svg' || tag === 'rect') {
-        setNewNode(p);
-        setNewLabel('');
-      }
+    if (mode === 'addNode' && onCanvas) {
+      setNewNode(pt(e));
+      setNewLabel('');
     }
-
-    if (mode === 'addEdge' && edgeFrom) {
-      // clicked canvas — cancel edge
-      const tag = e.target.tagName.toLowerCase();
-      if (tag === 'svg' || tag === 'rect') {
-        setEdgeFrom(null);
-      }
+    if (mode === 'addEdge' && edgeFrom && onCanvas) {
+      setEdgeFrom(null);
     }
-
-    if (mode === 'select') {
-      const tag = e.target.tagName.toLowerCase();
-      if (tag === 'svg' || tag === 'rect') {
-        setSelected(null);
-      }
+    if (mode === 'select' && onCanvas) {
+      setSelected(null);
     }
   }
 
-  function handleNodeMouseDown(e, nodeId) {
+  // ── Node events ──────────────────────────────────────────────────────────
+  function handleNodePointerDown(e, nodeId) {
     e.stopPropagation();
     if (mode !== 'select') return;
-    const p = pt(e);
-    const node = nodes.find(n => n.id === nodeId);
-    setDrag({ id: nodeId, ox: node.x - p.x, oy: node.y - p.y });
+    dragRef.current = { id: nodeId };
+    didDragRef.current = false;
+    // Capture so we keep getting events if pointer leaves SVG
+    try { svgRef.current.setPointerCapture(e.pointerId); } catch {}
+    const n = simNodesRef.current.find(n => n.id === nodeId);
+    if (n) { n.fx = n.x; n.fy = n.y; }
+    simRef.current?.alphaTarget(0.3).restart();
   }
 
   function handleNodeClick(e, nodeId) {
     e.stopPropagation();
+    if (didDragRef.current) { didDragRef.current = false; return; }
 
     if (mode === 'select') {
       setSelected({ type: 'node', id: nodeId });
     }
-
     if (mode === 'delete') {
+      simNodesRef.current = simNodesRef.current.filter(n => n.id !== nodeId);
       setNodes(prev => prev.filter(n => n.id !== nodeId));
       setEdges(prev => prev.filter(ed => ed.from !== nodeId && ed.to !== nodeId));
       setSelected(null);
     }
-
     if (mode === 'addEdge') {
       if (!edgeFrom) {
         setEdgeFrom(nodeId);
       } else {
-        const from = edgeFrom;
-        const to   = nodeId;
+        const from = edgeFrom, to = nodeId;
         if (from !== to && !wouldCycle(edges, from, to)) {
-          const exists = edges.some(ed => ed.from === from && ed.to === to);
-          if (!exists) {
-            setEdges(prev => [...prev, { id: `${from}${to}_${_seq++}`, from, to }]);
-          }
+          const dup = edges.some(ed => ed.from === from && ed.to === to);
+          if (!dup) setEdges(prev => [...prev, { id: `${from}${to}_${_seq++}`, from, to }]);
         }
         setEdgeFrom(null);
       }
     }
   }
 
+  // ── Edge events ──────────────────────────────────────────────────────────
   function handleEdgeClick(e, edgeId) {
     e.stopPropagation();
-    if (mode === 'select') {
-      setSelected({ type: 'edge', id: edgeId });
-    }
+    if (mode === 'select') setSelected({ type: 'edge', id: edgeId });
     if (mode === 'delete') {
       setEdges(prev => prev.filter(ed => ed.id !== edgeId));
       setSelected(null);
     }
   }
 
+  // ── Add-node confirmation ────────────────────────────────────────────────
   function confirmNewNode() {
     const label = newLabel.trim();
-    if (!label) { setNewNode(null); return; }
-    const id = `N${_seq++}`;
-    setNodes(prev => [...prev, { id, label, x: newNode.x, y: newNode.y }]);
+    if (label) {
+      const id = `N${_seq++}`;
+      // Pre-seed position so it appears at the click point before simulation takes over
+      simNodesRef.current.push({ id, label, x: newNode.x, y: newNode.y });
+      setNodes(prev => [...prev, { id, label }]);
+    }
     setNewNode(null);
     setNewLabel('');
     setMode('select');
   }
 
-  /* ── Mode label ── */
+  // ── Derived ──────────────────────────────────────────────────────────────
+  const simById    = Object.fromEntries(simNodesRef.current.map(n => [n.id, n]));
+  const sourceNode = edgeFrom ? simById[edgeFrom] : null;
+
   const modeLabels = {
     select:  'Select / Drag',
     addNode: 'Add Node — click canvas',
-    addEdge: edgeFrom
-      ? `Add Edge — click target node`
-      : 'Add Edge — click source node',
+    addEdge: edgeFrom ? 'Add Edge — click target node' : 'Add Edge — click source node',
     delete:  'Delete — click node or edge',
   };
 
-  /* ── Ghost line ── */
-  const sourceNode = edgeFrom ? nodes.find(n => n.id === edgeFrom) : null;
-
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#fafafa' }}>
 
       {/* AppBar */}
       <AppBar position="static" elevation={0} sx={{
-        bgcolor: '#fff',
-        borderBottom: '1px solid #e7e7e7',
-        color: PURPLE,
+        bgcolor: '#fff', borderBottom: '1px solid #e7e7e7', color: PURPLE,
       }}>
         <Toolbar variant="dense" sx={{ minHeight: '50px !important', gap: 1 }}>
           <HubIcon sx={{ color: PURPLE, mr: 0.5 }} />
-          <Typography
-            component={Link}
-            href="/"
-            variant="subtitle1"
-            sx={{ fontWeight: 700, color: PURPLE, textDecoration: 'none', flexGrow: 1 }}
-          >
+          <Typography component={Link} href="/" variant="subtitle1"
+            sx={{ fontWeight: 700, color: PURPLE, textDecoration: 'none', flexGrow: 1 }}>
             Bayesian Networks
           </Typography>
-          <Button
-            component="a"
-            href="https://github.com/marink/probabilistic.net"
-            target="_blank"
-            rel="noreferrer"
-            sx={{ color: '#777', minWidth: 0, p: 0.5 }}
-          >
+          <Button component="a" href="https://github.com/marink/probabilistic.net"
+            target="_blank" rel="noreferrer"
+            sx={{ color: '#777', minWidth: 0, p: 0.5 }}>
             <GitHubIcon sx={{ fontSize: 20 }} />
           </Button>
         </Toolbar>
       </AppBar>
 
-      {/* Toolbar: controls */}
+      {/* Controls toolbar */}
       <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 1.5,
-        px: 2,
-        py: 1,
-        bgcolor: '#fff',
-        borderBottom: '1px solid #e7e7e7',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        gap: 1.5, px: 2, py: 1,
+        bgcolor: '#fff', borderBottom: '1px solid #e7e7e7',
       }}>
-        {/* Mode buttons */}
         <ButtonGroup size="small" variant="outlined">
-          <Tooltip title="Select / Drag nodes">
-            <Button
-              onClick={() => changeMode('select')}
-              variant={mode === 'select' ? 'contained' : 'outlined'}
-              sx={{
-                borderColor: PURPLE,
-                color: mode === 'select' ? '#fff' : PURPLE,
-                bgcolor: mode === 'select' ? PURPLE : 'transparent',
-                '&:hover': { bgcolor: mode === 'select' ? PURPLE_LIGHT : PP },
-              }}
-              startIcon={<NearMeIcon />}
-            >
-              Select
-            </Button>
-          </Tooltip>
-          <Tooltip title="Click canvas to add a node">
-            <Button
-              onClick={() => changeMode('addNode')}
-              variant={mode === 'addNode' ? 'contained' : 'outlined'}
-              sx={{
-                borderColor: PURPLE,
-                color: mode === 'addNode' ? '#fff' : PURPLE,
-                bgcolor: mode === 'addNode' ? PURPLE : 'transparent',
-                '&:hover': { bgcolor: mode === 'addNode' ? PURPLE_LIGHT : PP },
-              }}
-              startIcon={<AddCircleOutlineIcon />}
-            >
-              Add Node
-            </Button>
-          </Tooltip>
-          <Tooltip title="Click source then target node">
-            <Button
-              onClick={() => changeMode('addEdge')}
-              variant={mode === 'addEdge' ? 'contained' : 'outlined'}
-              sx={{
-                borderColor: PURPLE,
-                color: mode === 'addEdge' ? '#fff' : PURPLE,
-                bgcolor: mode === 'addEdge' ? PURPLE : 'transparent',
-                '&:hover': { bgcolor: mode === 'addEdge' ? PURPLE_LIGHT : PP },
-              }}
-              startIcon={<ArrowForwardIcon />}
-            >
-              Add Edge
-            </Button>
-          </Tooltip>
-          <Tooltip title="Click a node or edge to delete it">
-            <Button
-              onClick={() => changeMode('delete')}
+          {[
+            { key: 'select',  label: 'Select',   icon: <NearMeIcon />,       tip: 'Select / drag nodes' },
+            { key: 'addNode', label: 'Add Node',  icon: <AddCircleIcon />,    tip: 'Click canvas to place a node' },
+            { key: 'addEdge', label: 'Add Edge',  icon: <ArrowForwardIcon />, tip: 'Click source, then target' },
+          ].map(({ key, label, icon, tip }) => (
+            <Tooltip key={key} title={tip}>
+              <Button onClick={() => changeMode(key)}
+                variant={mode === key ? 'contained' : 'outlined'}
+                startIcon={icon}
+                sx={{
+                  borderColor: PURPLE,
+                  color: mode === key ? '#fff' : PURPLE,
+                  bgcolor: mode === key ? PURPLE : 'transparent',
+                  '&:hover': { bgcolor: mode === key ? PURPLE_LIGHT : PP },
+                }}>
+                {label}
+              </Button>
+            </Tooltip>
+          ))}
+          <Tooltip title="Click a node or edge to remove it">
+            <Button onClick={() => changeMode('delete')}
               variant={mode === 'delete' ? 'contained' : 'outlined'}
+              startIcon={<DeleteIcon />}
               sx={{
                 borderColor: '#d9534f',
                 color: mode === 'delete' ? '#fff' : '#d9534f',
                 bgcolor: mode === 'delete' ? '#d9534f' : 'transparent',
                 '&:hover': { bgcolor: mode === 'delete' ? '#c9302c' : '#fdf2f2' },
-              }}
-              startIcon={<DeleteOutlineIcon />}
-            >
+              }}>
               Delete
             </Button>
           </Tooltip>
         </ButtonGroup>
 
-        {/* Example loader */}
-        <select
-          defaultValue=""
-          onChange={e => { loadExample(e.target.value); e.target.value = ''; }}
+        <select defaultValue="" onChange={e => { loadExample(e.target.value); e.target.value = ''; }}
           style={{
-            fontSize: 13,
-            padding: '4px 8px',
-            border: '1px solid #ccc',
-            borderRadius: 4,
-            color: '#555',
-            cursor: 'pointer',
-            background: '#fff',
-          }}
-        >
+            fontSize: 13, padding: '4px 8px',
+            border: '1px solid #ccc', borderRadius: 4,
+            color: '#555', cursor: 'pointer', background: '#fff',
+          }}>
           <option value="" disabled>Load example…</option>
-          {Object.keys(EXAMPLES).map(k => (
-            <option key={k} value={k}>{k}</option>
-          ))}
+          {Object.keys(EXAMPLES).map(k => <option key={k} value={k}>{k}</option>)}
         </select>
 
-        {/* Counts */}
-        <Chip label={`${nodes.length} nodes`} size="small" sx={{ bgcolor: PP, color: PURPLE, fontWeight: 600 }} />
-        <Chip label={`${edges.length} edges`} size="small" sx={{ bgcolor: '#f5f5f5', color: '#555' }} />
+        <Chip label={`${nodes.length} nodes`} size="small"
+          sx={{ bgcolor: PP, color: PURPLE, fontWeight: 600 }} />
+        <Chip label={`${edges.length} edges`} size="small"
+          sx={{ bgcolor: '#f5f5f5', color: '#555' }} />
 
-        {/* Status */}
         <Typography variant="caption" sx={{ color: '#888', ml: 'auto', fontStyle: 'italic' }}>
           {modeLabels[mode]}
         </Typography>
@@ -384,54 +386,42 @@ export default function Builder() {
         <Paper variant="outlined" sx={{ width: '100%', height: '100%', borderRadius: 1, overflow: 'hidden' }}>
           <svg
             ref={svgRef}
-            width="100%"
-            height="100%"
-            style={{ display: 'block', cursor: mode === 'addNode' ? 'crosshair' : mode === 'delete' ? 'not-allowed' : 'default' }}
+            width="100%" height="100%"
+            style={{
+              display: 'block',
+              cursor: mode === 'addNode' ? 'crosshair' : mode === 'delete' ? 'not-allowed' : 'default',
+            }}
             onClick={handleSvgClick}
-            onMouseMove={handleSvgMouseMove}
-            onMouseUp={handleSvgMouseUp}
-            onMouseLeave={() => { setMouse(null); setDrag(null); }}
+            onPointerMove={handleSvgPointerMove}
+            onPointerUp={handleSvgPointerUp}
+            onPointerLeave={handleSvgPointerUp}
           >
             <defs>
-              {/* Purple arrowhead */}
-              <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <marker id="arr"     markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill={PURPLE} />
               </marker>
-              {/* Gray arrowhead for ghost */}
-              <marker id="arr-g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <marker id="arr-g"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#aaa" />
               </marker>
-              {/* Orange arrowhead for selected edge */}
               <marker id="arr-sel" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#e67e22" />
               </marker>
             </defs>
 
-            {/* Empty canvas hint */}
+            {/* Empty-canvas hint */}
             {nodes.length === 0 && (
-              <text
-                x="50%"
-                y="50%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={16}
-                fill="#bbb"
-                style={{ userSelect: 'none', pointerEvents: 'none' }}
-              >
-                Click &ldquo;Add Node&rdquo; then click the canvas to add your first node
+              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+                fontSize={16} fill="#bbb"
+                style={{ userSelect: 'none', pointerEvents: 'none' }}>
+                Switch to Add Node, then click here to start
               </text>
             )}
 
             {/* Ghost edge while drawing */}
             {mode === 'addEdge' && sourceNode && mouse && (
               <line
-                x1={sourceNode.x}
-                y1={sourceNode.y}
-                x2={mouse.x}
-                y2={mouse.y}
-                stroke="#aaa"
-                strokeWidth={1.5}
-                strokeDasharray="6 4"
+                x1={sourceNode.x} y1={sourceNode.y} x2={mouse.x} y2={mouse.y}
+                stroke="#aaa" strokeWidth={1.5} strokeDasharray="6 4"
                 markerEnd="url(#arr-g)"
                 style={{ pointerEvents: 'none' }}
               />
@@ -439,78 +429,53 @@ export default function Builder() {
 
             {/* Edges */}
             {edges.map(ed => {
-              const from = nodes.find(n => n.id === ed.from);
-              const to   = nodes.find(n => n.id === ed.to);
-              if (!from || !to) return null;
+              const from = simById[ed.from], to = simById[ed.to];
+              if (!from || !to || from.x == null || to.x == null) return null;
               const { x1, y1, x2, y2 } = linePts(from, to);
               const isSel = selected?.type === 'edge' && selected.id === ed.id;
               return (
-                <line
-                  key={ed.id}
-                  x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke={isSel ? '#e67e22' : PURPLE}
-                  strokeWidth={isSel ? 2.5 : 1.8}
-                  markerEnd={isSel ? 'url(#arr-sel)' : 'url(#arr)'}
-                  style={{ cursor: mode === 'delete' ? 'pointer' : 'default' }}
-                  onClick={e => handleEdgeClick(e, ed.id)}
-                >
+                <g key={ed.id}>
+                  <line x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke={isSel ? '#e67e22' : PURPLE}
+                    strokeWidth={isSel ? 2.5 : 1.8}
+                    markerEnd={isSel ? 'url(#arr-sel)' : 'url(#arr)'}
+                    style={{ pointerEvents: 'none' }}
+                  />
                   {/* Wider invisible hit area */}
-                  <title>{`${ed.from} → ${ed.to}`}</title>
-                </line>
-              );
-            })}
-
-            {/* Invisible wider hit areas for edges */}
-            {edges.map(ed => {
-              const from = nodes.find(n => n.id === ed.from);
-              const to   = nodes.find(n => n.id === ed.to);
-              if (!from || !to) return null;
-              const { x1, y1, x2, y2 } = linePts(from, to);
-              return (
-                <line
-                  key={`hit-${ed.id}`}
-                  x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke="transparent"
-                  strokeWidth={12}
-                  style={{ cursor: mode === 'delete' ? 'pointer' : 'default' }}
-                  onClick={e => handleEdgeClick(e, ed.id)}
-                />
+                  <line x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke="transparent" strokeWidth={12}
+                    style={{ cursor: mode === 'delete' ? 'pointer' : 'default' }}
+                    onClick={e => handleEdgeClick(e, ed.id)}
+                  />
+                </g>
               );
             })}
 
             {/* Nodes */}
-            {nodes.map(n => {
-              const isSel  = selected?.type === 'node' && selected.id === n.id;
-              const isSrc  = edgeFrom === n.id;
+            {simNodesRef.current.map(n => {
+              if (n.x == null) return null;
+              const isSel = selected?.type === 'node' && selected.id === n.id;
+              const isSrc = edgeFrom === n.id;
               const fill   = isSel ? PP : isSrc ? '#e8e0f4' : '#fff';
-              const stroke = isSel ? PURPLE : isSrc ? PURPLE_LIGHT : PURPLE;
+              const stroke = isSel || isSrc ? PURPLE_LIGHT : PURPLE;
               const sw     = isSel || isSrc ? 2.5 : 1.8;
               return (
-                <g
-                  key={n.id}
-                  transform={`translate(${n.x},${n.y})`}
+                <g key={n.id} transform={`translate(${n.x},${n.y})`}
                   style={{
-                    cursor: mode === 'select' ? 'grab' : mode === 'delete' ? 'pointer' : 'pointer',
+                    cursor: mode === 'select'
+                      ? (dragRef.current?.id === n.id ? 'grabbing' : 'grab')
+                      : 'pointer',
                   }}
-                  onMouseDown={e => handleNodeMouseDown(e, n.id)}
+                  onPointerDown={e => handleNodePointerDown(e, n.id)}
                   onClick={e => handleNodeClick(e, n.id)}
                 >
-                  <circle
-                    r={R}
-                    fill={fill}
-                    stroke={stroke}
-                    strokeWidth={sw}
-                  />
-                  <text
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={n.label.length > 9 ? 9 : 11}
+                  <circle r={R} fill={fill} stroke={stroke} strokeWidth={sw} />
+                  <text textAnchor="middle" dominantBaseline="middle"
+                    fontSize={n.label.length > 10 ? 9 : 11}
                     fontFamily="Helvetica Neue, Arial, sans-serif"
-                    fill={PURPLE}
-                    fontWeight={600}
-                    style={{ pointerEvents: 'none', userSelect: 'none' }}
-                  >
-                    {n.label}
+                    fill={PURPLE} fontWeight={600}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                    {n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label}
                   </text>
                 </g>
               );
@@ -518,15 +483,9 @@ export default function Builder() {
 
             {/* Inline node-name input */}
             {newNode && (
-              <foreignObject
-                x={newNode.x - 70}
-                y={newNode.y - 18}
-                width={140}
-                height={36}
-              >
+              <foreignObject x={newNode.x - 70} y={newNode.y - 18} width={140} height={36}>
                 <div xmlns="http://www.w3.org/1999/xhtml"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}
-                >
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                   <input
                     autoFocus
                     value={newLabel}
@@ -538,16 +497,11 @@ export default function Builder() {
                     onBlur={confirmNewNode}
                     placeholder="Node name…"
                     style={{
-                      width: '130px',
-                      fontSize: 13,
-                      padding: '4px 8px',
-                      border: `2px solid ${PURPLE}`,
-                      borderRadius: 20,
-                      outline: 'none',
-                      textAlign: 'center',
+                      width: 130, fontSize: 13, padding: '4px 8px',
+                      border: `2px solid ${PURPLE}`, borderRadius: 20,
+                      outline: 'none', textAlign: 'center',
                       fontFamily: 'Helvetica Neue, Arial, sans-serif',
-                      color: PURPLE,
-                      background: '#fff',
+                      color: PURPLE, background: '#fff',
                     }}
                   />
                 </div>
@@ -559,28 +513,17 @@ export default function Builder() {
 
       {/* Footer */}
       <Box component="footer" sx={{
-        borderTop: '1px solid #e5e5e5',
-        bgcolor: '#f5f5f5',
-        py: 1,
-        px: 2,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 0.5,
+        borderTop: '1px solid #e5e5e5', bgcolor: '#f5f5f5',
+        py: 1, px: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <Typography variant="caption" color="text.secondary">
           probabilistic.net ·{' '}
-          <a
-            href="https://marin.kokona.website"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: PURPLE, textDecoration: 'none' }}
-          >
+          <a href="https://marin.kokona.website" target="_blank" rel="noreferrer"
+            style={{ color: PURPLE, textDecoration: 'none' }}>
             Marin&apos;s Web Site
           </a>
         </Typography>
       </Box>
-
     </Box>
   );
 }
