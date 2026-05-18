@@ -84,10 +84,10 @@ function runInference(nodes, edges, cpts, evidence) {
 const EXAMPLES = {
   Sprinkler: {
     nodes: [
-      { id: 'C', label: 'Cloudy' },
-      { id: 'S', label: 'Sprinkler' },
-      { id: 'R', label: 'Rain' },
-      { id: 'W', label: 'Wet Grass' },
+      { id: 'C', label: 'Cloudy',     x: 350, y: 165 },
+      { id: 'S', label: 'Sprinkler',  x: 230, y: 295 },
+      { id: 'R', label: 'Rain',       x: 470, y: 295 },
+      { id: 'W', label: 'Wet Grass',  x: 350, y: 430 },
     ],
     edges: [
       { id: 'CS', from: 'C', to: 'S' }, { id: 'CR', from: 'C', to: 'R' },
@@ -103,11 +103,11 @@ const EXAMPLES = {
   },
   'Burglary / Alarm': {
     nodes: [
-      { id: 'B', label: 'Burglary' },
-      { id: 'E', label: 'Earthquake' },
-      { id: 'A', label: 'Alarm' },
-      { id: 'J', label: 'John Calls' },
-      { id: 'M', label: 'Mary Calls' },
+      { id: 'B', label: 'Burglary',   x: 210, y: 165 },
+      { id: 'E', label: 'Earthquake', x: 490, y: 165 },
+      { id: 'A', label: 'Alarm',      x: 350, y: 285 },
+      { id: 'J', label: 'John Calls', x: 470, y: 415 },
+      { id: 'M', label: 'Mary Calls', x: 245, y: 415 },
     ],
     edges: [
       { id: 'BA', from: 'B', to: 'A' }, { id: 'EA', from: 'E', to: 'A' },
@@ -124,11 +124,11 @@ const EXAMPLES = {
   },
   Student: {
     nodes: [
-      { id: 'D', label: 'Difficulty' },
-      { id: 'I', label: 'Intelligence' },
-      { id: 'G', label: 'Grade (A)' },
-      { id: 'S', label: 'SAT' },
-      { id: 'L', label: 'Letter' },
+      { id: 'D', label: 'Difficulty',   x: 225, y: 225 },
+      { id: 'I', label: 'Intelligence', x: 465, y: 200 },
+      { id: 'G', label: 'Grade (A)',    x: 335, y: 315 },
+      { id: 'S', label: 'SAT',         x: 510, y: 310 },
+      { id: 'L', label: 'Letter',      x: 330, y: 440 },
     ],
     edges: [
       { id: 'DG', from: 'D', to: 'G' }, { id: 'IG', from: 'I', to: 'G' },
@@ -141,6 +141,37 @@ const EXAMPLES = {
       G: { '00': 0.3, '10': 0.05, '01': 0.9, '11': 0.5 },
       S: { '0': 0.2,  '1': 0.95 },
       L: { '0': 0.1,  '1': 0.9  },
+    },
+  },
+  'Eczema / Atopic Dermatitis': {
+    nodes: [
+      { id: 'Gen',     label: 'Genetic Risk',        x: 375, y: 160 },
+      { id: 'Det',     label: 'Irritant Products',   x: 535, y: 135 },
+      { id: 'DM',      label: 'Dust Mite Exposure',  x: 155, y: 240 },
+      { id: 'Diet',    label: 'High Sugar Diet',     x: 195, y: 155 },
+      { id: 'Barrier', label: 'Broken Skin Barrier', x: 470, y: 245 },
+      { id: 'Th2',     label: 'Th2 Dysregulation',   x: 295, y: 265 },
+      { id: 'Flare',   label: 'Eczema Flare',        x: 380, y: 420 },
+    ],
+    edges: [
+      { id: 'GenB',  from: 'Gen',     to: 'Barrier' },
+      { id: 'DetB',  from: 'Det',     to: 'Barrier' },
+      { id: 'GenT',  from: 'Gen',     to: 'Th2'     },
+      { id: 'DMT',   from: 'DM',      to: 'Th2'     },
+      { id: 'DietT', from: 'Diet',    to: 'Th2'     },
+      { id: 'BF',    from: 'Barrier', to: 'Flare'   },
+      { id: 'TF',    from: 'Th2',     to: 'Flare'   },
+    ],
+    // parents: Barrier←[Gen,Det], Th2←[Gen,DM,Diet], Flare←[Barrier,Th2]
+    cpts: {
+      Gen:     { '': 0.25 },
+      Det:     { '': 0.60 },
+      DM:      { '': 0.55 },
+      Diet:    { '': 0.65 },
+      Barrier: { '00': 0.05, '10': 0.40, '01': 0.30, '11': 0.75 },
+      Th2:     { '000': 0.04, '100': 0.30, '010': 0.18, '110': 0.55,
+                 '001': 0.22, '101': 0.55, '011': 0.42, '111': 0.85 },
+      Flare:   { '00': 0.03, '10': 0.38, '01': 0.32, '11': 0.88 },
     },
   },
 };
@@ -305,8 +336,8 @@ export default function Builder() {
   const simNodesRef = useRef(
     initEx.nodes.map((n, i) => ({
       id: n.id, label: n.label,
-      x: 380 + Math.cos((i / initEx.nodes.length) * 2 * Math.PI) * 40,
-      y: 280 + Math.sin((i / initEx.nodes.length) * 2 * Math.PI) * 40,
+      x: n.x ?? 380 + Math.cos((i / initEx.nodes.length) * 2 * Math.PI) * 40,
+      y: n.y ?? 280 + Math.sin((i / initEx.nodes.length) * 2 * Math.PI) * 40,
     }))
   );
   const dragRef    = useRef(null);
@@ -383,8 +414,8 @@ export default function Builder() {
     const ex = EXAMPLES[name];
     simNodesRef.current = ex.nodes.map((n, i) => ({
       id: n.id, label: n.label,
-      x: 380 + Math.cos((i / ex.nodes.length) * 2 * Math.PI) * 30,
-      y: 280 + Math.sin((i / ex.nodes.length) * 2 * Math.PI) * 30,
+      x: n.x ?? 380 + Math.cos((i / ex.nodes.length) * 2 * Math.PI) * 30,
+      y: n.y ?? 280 + Math.sin((i / ex.nodes.length) * 2 * Math.PI) * 30,
     }));
     setNodes(ex.nodes.map(n => ({ ...n })));
     setEdges(ex.edges.map(e => ({ ...e })));
